@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SISTEMA UMBRA | MOBILE LINK</title>
+    <style>
+        /* ==========================================================================
+           1. VARIÁVEIS E RESET
+           ========================================================================== */
+        :root {
+            --bg-void: #000000;
+            --bg-panel: #0a0a0a;
+            --bg-border: #1a1a1a;
+            --text-main: #d0d0d0;
+            --text-dim: #606060;
+            --highlight: #ffffff;
+            --font-tech: 'Courier New', 'Consolas', monospace;
+            --font-ui: 'Arial', sans-serif;
+            --font-header: 'Impact', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--bg-void);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            font-size: 13px;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ==========================================================================
+           2. CAMADAS E EFEITOS
+           ========================================================================== */
+        .fx-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9000;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px);
+            background-size: 100% 4px; opacity: 0.3;
+        }
+        
+        .fx-vignette {
+            position: fixed; inset: 0; pointer-events: none; z-index: 8999;
+            background: radial-gradient(circle, transparent 40%, black 130%);
+        }
+
+        /* TELA DE BOOT (SIMPLIFICADA PARA MOBILE) */
+        #boot-screen {
+            position: fixed; inset: 0; background: #000; z-index: 10000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            font-family: var(--font-tech); color: #fff; font-size: 14px; text-align: center;
+        }
+        .boot-loader { width: 50%; height: 2px; background: #333; margin-top: 20px; position: relative; }
+        .boot-bar { position: absolute; top: 0; left: 0; height: 100%; background: #fff; width: 0%; transition: width 0.5s; }
+
+        /* ==========================================================================
+           3. LAYOUT RESPONSIVO
+           ========================================================================== */
+        
+        /* HEADER */
+        header {
+            height: 50px; background: var(--bg-panel); border-bottom: 1px solid var(--bg-border);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 15px; flex-shrink: 0; z-index: 100;
+        }
+        .logo { font-family: var(--font-header); font-size: 20px; color: #fff; letter-spacing: 2px; }
+        .logo span { font-family: var(--font-tech); font-size: 9px; color: #555; display: block; letter-spacing: 3px; margin-top: -2px; }
+        .sys-clock { font-family: var(--font-tech); font-size: 12px; color: #888; }
+
+        /* ÁREA PRINCIPAL */
+        #workspace { flex-grow: 1; position: relative; overflow: hidden; background: var(--bg-void); }
+
+        /* MENUS LATERAIS (DESKTOP) */
+        #sidebar-nav, #sidebar-widgets {
+            width: 240px; background: var(--bg-panel); border-right: 1px solid var(--bg-border);
+            display: flex; flex-direction: column; padding: 20px 0; z-index: 50;
+        }
+        #sidebar-widgets { width: 280px; border-right: none; border-left: 1px solid var(--bg-border); }
+        
+        /* BOTÕES DE NAVEGAÇÃO (DESKTOP) */
+        .nav-btn {
+            width: 100%; text-align: left; padding: 12px 20px; background: transparent; border: none;
+            color: #777; font-family: var(--font-ui); font-size: 12px; cursor: pointer;
+            border-left: 3px solid transparent; transition: 0.2s; text-transform: uppercase;
+        }
+        .nav-btn:hover, .nav-btn.active { background: #111; color: #fff; border-left-color: #fff; font-weight: bold; }
+
+        /* MENU INFERIOR (MOBILE ONLY) */
+        #mobile-nav {
+            display: none; height: 60px; background: #0a0a0a; border-top: 1px solid #222;
+            justify-content: space-around; align-items: center; z-index: 200; padding-bottom: 5px;
+        }
+        .mob-btn {
+            background: transparent; border: none; color: #555; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; width: 100%; height: 100%;
+        }
+        .mob-btn i { font-size: 20px; margin-bottom: 3px; }
+        .mob-btn span { font-size: 9px; font-family: var(--font-tech); text-transform: uppercase; }
+        .mob-btn.active { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+
+        /* PAINÉIS DE VISUALIZAÇÃO */
+        .view-panel {
+            position: absolute; inset: 0; display: none; overflow-y: auto; overflow-x: hidden;
+            opacity: 0; animation: fadeIn 0.3s forwards; padding-bottom: 20px;
+        }
+        .view-panel.active { display: block; }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        /* ==========================================================================
+           4. CONTEÚDO ESPECÍFICO (MAPA, TERMINAL...)
+           ========================================================================== */
+        
+        /* MAPA */
+        .map-wrapper { width: 100%; height: 100%; position: relative; background: radial-gradient(circle at center, #111 0%, #000 90%); }
+        .grid-lines {
+            position: absolute; inset: 0; opacity: 0.1;
+            background-image: linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .map-point {
+            position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%;
+            transform: translate(-50%, -50%); box-shadow: 0 0 15px rgba(255,255,255,0.6); cursor: pointer;
+        }
+        .pulse { position: absolute; inset: -10px; border: 1px solid #fff; border-radius: 50%; animation: pulse 2s infinite; opacity: 0; }
+        @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+
+        /* TERMINAL */
+        .term-box { padding: 15px; font-family: var(--font-tech); font-size: 11px; height: 100%; display: flex; flex-direction: column; }
+        #term-out { flex-grow: 1; overflow-y: auto; color: #aaa; margin-bottom: 10px; word-wrap: break-word; }
+        .term-line { margin-bottom: 5px; }
+        .input-line { display: flex; border-top: 1px solid #333; padding-top: 10px; }
+        #term-in { background: transparent; border: none; color: #fff; width: 100%; font-family: inherit; margin-left: 5px; font-size: 12px; }
+
+        /* DATABASE */
+        .db-list { display: flex; flex-direction: column; padding: 10px; }
+        .db-btn {
+            text-align: left; padding: 15px; background: #080808; border: 1px solid #222;
+            color: #888; margin-bottom: 8px; font-family: var(--font-tech); font-size: 11px;
+        }
+        .db-btn:active, .db-btn:hover { background: #151515; color: #fff; border-color: #555; }
+        
+        .db-reader { padding: 20px; display: none; }
+        .db-reader.active { display: block; }
+        .doc-header { border-bottom: 1px solid #333; margin-bottom: 15px; padding-bottom: 10px; }
+        .doc-title { font-size: 18px; color: #fff; text-transform: uppercase; }
+        .doc-body { color: #aaa; line-height: 1.6; text-align: justify; font-size: 13px; }
+        .back-btn { margin-bottom: 15px; padding: 5px 10px; background: #222; color: #fff; border: none; font-size: 10px; }
+
+        /* CRYPT */
+        .crypt-ui { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px; text-align: center; }
+        .crypt-display { font-family: var(--font-tech); font-size: 16px; color: #fff; letter-spacing: 2px; margin: 30px 0; min-height: 20px; word-break: break-all;}
+        .crypt-btn { background: #fff; color: #000; padding: 15px 30px; font-weight: bold; border: none; font-family: var(--font-tech); text-transform: uppercase; }
+
+        /* FOOTER (DESKTOP ONLY) */
+        footer { height: 25px; background: #000; border-top: 1px solid #222; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-family: var(--font-tech); font-size: 9px; color: #444; }
+
+        /* ==========================================================================
+           5. RESPONSIVIDADE (A MÁGICA ACONTECE AQUI)
+           ========================================================================== */
+        @media (min-width: 901px) {
+            #workspace { display: flex; }
+            #mobile-nav { display: none; } /* Esconde menu mobile no PC */
+        }
+
+        @media (max-width: 900px) {
+            body { font-size: 14px; }
+            /* Layout Mobile */
+            #sidebar-nav, #sidebar-widgets, footer { display: none !important; } /* Esconde menus de PC */
+            #mobile-nav { display: flex; } /* Mostra menu de celular */
+            
+            /* Ajustes Header Mobile */
+            header { padding: 0 10px; }
+            .logo { font-size: 18px; }
+            
+            /* Ajustes de Mapa para Mobile */
+            .map-point { width: 16px; height: 16px; } /* Pontos maiores para dedo */
+            
+            /* Ajustes de Terminal */
+            #term-in { font-size: 16px; } /* Evita zoom automático do iPhone */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="boot-screen">
+        <div style="margin-bottom: 10px;">INICIALIZANDO UMBRA OS v11.0</div>
+        <div class="boot-loader"><div class="boot-bar" id="boot-progress"></div></div>
+        <div id="boot-status" style="margin-top: 10px; color: #666; font-size: 10px;">Carregando módulos...</div>
+    </div>
+
+    <div class="fx-overlay"></div>
+    <div class="fx-vignette"></div>
+
+    <header>
+        <div class="logo">UMBRA<br><span>NETWORK</span></div>
+        <div class="sys-clock" id="clock">00:00:00</div>
+    </header>
+
+    <div id="workspace">
+        
+        <aside id="sidebar-nav">
+            <button class="nav-btn active" onclick="go('map')">MAPA GLOBAL</button>
+            <button class="nav-btn" onclick="go('term')">TERMINAL CLI</button>
+            <button class="nav-btn" onclick="go('db')">ARQUIVOS</button>
+            <button class="nav-btn" onclick="go('crypt')">DECODIFICADOR</button>
+            <div style="margin-top: auto; padding: 20px; font-size: 10px; color: #444;">
+                CONEXÃO SEGURA<br>NÓ: BR-01
+            </div>
+        </aside>
+
+        <main id="main-stage">
+            
+            <div id="view-map" class="view-panel active">
+                <div class="map-wrapper">
+                    <div class="grid-lines"></div>
+                    <div class="map-point" style="top:30%; left:20%;" onclick="alert('NOVA YORK: ATIVO')"><div class="pulse"></div></div>
+                    <div class="map-point" style="top:25%; left:45%;" onclick="alert('LONDRES: SILENCIOSO')"><div class="pulse"></div></div>
+                    <div class="map-point" style="top:70%; left:32%;" onclick="alert('SÃO PAULO: ALERTA')"><div class="pulse"></div></div>
+                    <div class="map-point" style="top:35%; left:85%;" onclick="alert('TÓQUIO: CRÍTICO')"><div class="pulse"></div></div>
+                    
+                    <div style="position: absolute; bottom: 20px; left: 20px; font-family: var(--font-tech); font-size: 10px; background: rgba(0,0,0,0.7); padding: 5px; border: 1px solid #333; color: #fff;">
+                        RASTREAMENTO MÓVEL<br>SATÉLITE: ONLINE
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-term" class="view-panel">
+                <div class="term-box">
+                    <div id="term-out">
+                        <div class="term-line" style="color:#fff">BEM-VINDO AO TERMINAL UMBRA.</div>
+                        <div class="term-line">Digite 'ajuda' para começar.</div>
+                    </div>
+                    <div class="input-line">
+                        <span>></span>
+                        <input type="text" id="term-in" autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-db" class="view-panel">
+                <div id="db-list-view" class="db-list">
+                    <div style="padding: 10px; font-size: 10px; color: #555;">ARQUIVOS DISPONÍVEIS:</div>
+                    <button class="db-btn" onclick="openDoc(1)">#001 - PROTOCOLO VIGILANTE</button>
+                    <button class="db-btn" onclick="openDoc(2)">#002 - AMEAÇA: SOMBRA</button>
+                    <button class="db-btn" onclick="openDoc(3)">#003 - LOCAIS NULOS</button>
+                    <button class="db-btn" onclick="openDoc(4)">#004 - REGISTRO DE ÁUDIO</button>
+                </div>
+                <div id="db-read-view" class="db-reader">
+                    <button class="back-btn" onclick="closeDoc()">VOLTAR</button>
+                    <div class="doc-header">
+                        <div class="doc-title" id="doc-title">TITULO</div>
+                        <div style="font-size: 10px; color: #666; margin-top: 5px;">CLASSIFICAÇÃO: SECRETO</div>
+                    </div>
+                    <div class="doc-body" id="doc-body">Conteúdo...</div>
+                </div>
+            </div>
+
+            <div id="view-crypt" class="view-panel">
+                <div class="crypt-ui">
+                    <div style="font-size: 10px; color: #666; margin-bottom: 20px;">INTERCEPTAÇÃO #902</div>
+                    <div class="crypt-display" id="crypt-text">BLOQUEADO</div>
+                    <button class="crypt-btn" onclick="runCrypt()">QUEBRAR SENHA</button>
+                </div>
+            </div>
+
+        </main>
+
+        <aside id="sidebar-widgets">
+            <div style="padding: 15px; border-bottom: 1px solid #222;">
+                <div style="font-size: 10px; color: #555; margin-bottom: 5px;">LOG DE SISTEMA</div>
+                <div id="pc-log" style="font-family: var(--font-tech); font-size: 9px; color: #777; height: 200px; overflow: hidden;"></div>
+            </div>
+            <div style="padding: 15px;">
+                <div style="font-size: 10px; color: #555; margin-bottom: 5px;">STATUS DE REDE</div>
+                <div style="height: 50px; display: flex; align-items: flex-end; gap: 2px;">
+                    <div class="bar" style="width:20%; background:#333; height: 30%"></div>
+                    <div class="bar" style="width:20%; background:#333; height: 60%"></div>
+                    <div class="bar" style="width:20%; background:#333; height: 40%"></div>
+                    <div class="bar" style="width:20%; background:#333; height: 80%"></div>
+                    <div class="bar" style="width:20%; background:#333; height: 50%"></div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <nav id="mobile-nav">
+        <button class="mob-btn active" onclick="go('map')">
+            <i>⌖</i><span>MAPA</span>
+        </button>
+        <button class="mob-btn" onclick="go('term')">
+            <i>_</i><span>CMD</span>
+        </button>
+        <button class="mob-btn" onclick="go('db')">
+            <i>≡</i><span>DADOS</span>
+        </button>
+        <button class="mob-btn" onclick="go('crypt')">
+            <i>?</i><span>CRYPT</span>
+        </button>
+    </nav>
+
+    <footer>
+        <div>USUÁRIO: FANTASMA</div>
+        <div>CRIPTOGRAFIA: AES-256</div>
+    </footer>
+
+    <script>
+        // 1. BOOT
+        window.onload = function() {
+            const bar = document.getElementById('boot-progress');
+            const status = document.getElementById('boot-status');
+            const screen = document.getElementById('boot-screen');
+            
+            setTimeout(() => { bar.style.width = "30%"; status.innerText = "Carregando Kernel..."; }, 500);
+            setTimeout(() => { bar.style.width = "70%"; status.innerText = "Descriptografando UI..."; }, 1200);
+            setTimeout(() => { bar.style.width = "100%"; status.innerText = "Pronto."; }, 2000);
+            setTimeout(() => { 
+                screen.style.opacity = 0; 
+                setTimeout(() => screen.style.display = 'none', 500);
+            }, 2500);
+
+            startClock();
+            startLogs();
+        };
+
+        // 2. NAVEGAÇÃO
+        function go(viewId) {
+            // Remove active de todos os botões (PC e Mobile)
+            document.querySelectorAll('.nav-btn, .mob-btn').forEach(b => b.classList.remove('active'));
+            // Adiciona active aos botões correspondentes (usando seletor simples por falta de ID único nos botões, em prod seria melhor)
+            // Para simplificar, vamos resetar e o usuário vê a mudança de tela.
+            
+            // Troca Telas
+            document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + viewId).classList.add('active');
+
+            // Highlights
+            // Simples hack para destacar o botão clicado
+            event.currentTarget.classList.add('active');
+        }
+
+        // 3. RELÓGIO
+        function startClock() {
+            setInterval(() => {
+                document.getElementById('clock').innerText = new Date().toLocaleTimeString('pt-BR');
+            }, 1000);
+        }
+
+        // 4. DOCS
+        const docs = [
+            { t: "PROTOCOLO VIGILANTE", b: "Nós operamos nas sombras. A missão é solitária. Não há resgate. O objetivo é monitorar as falhas na realidade." },
+            { t: "AMEAÇA: SOMBRA", b: "Entidade observada em locais urbanos. Alimenta-se de silêncio e frequências de rádio mortas. Não olhe diretamente." },
+            { t: "LOCAIS NULOS", b: "Estações de metrô vazias, túneis e prédios abandonados são pontos fracos na realidade. O Limbo vaza por eles." },
+            { t: "REGISTRO DE ÁUDIO", b: "[RUÍDO ESTÁTICO]... eles estão vindo pelas paredes... não é concreto, é pele... [FIM DA TRANSMISSÃO]" }
+        ];
+
+        function openDoc(id) {
+            const doc = docs[id-1];
+            document.getElementById('doc-title').innerText = doc.t;
+            document.getElementById('doc-body').innerText = doc.b;
+            
+            // Lógica para Mobile: Esconder lista, mostrar leitor
+            document.getElementById('db-list-view').style.display = 'none';
+            document.getElementById('db-read-view').style.display = 'block';
+            
+            // Lógica PC (apenas atualiza o conteudo, mas vamos manter o display block)
+             if(window.innerWidth > 900) {
+                 document.getElementById('db-list-view').style.display = 'block'; // Garante que lista fique visivel no PC
+             }
+        }
+
+        function closeDoc() {
+            document.getElementById('db-read-view').style.display = 'none';
+            document.getElementById('db-list-view').style.display = 'flex';
+        }
+
+        // 5. TERMINAL
+        const termIn = document.getElementById('term-in');
+        termIn.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const cmd = this.value.toLowerCase();
+                const out = document.getElementById('term-out');
+                
+                out.innerHTML += `<div class="term-line" style="color:#fff">> ${this.value}</div>`;
+                
+                if(cmd === 'ajuda') out.innerHTML += `<div class="term-line" style="color:#888">Comandos: status, limpar, escanear</div>`;
+                else if(cmd === 'status') out.innerHTML += `<div class="term-line" style="color:#0f0">SISTEMA SEGURO.</div>`;
+                else if(cmd === 'limpar') out.innerHTML = '';
+                else if(cmd === 'escanear') out.innerHTML += `<div class="term-line" style="color:#f00">3 AMEAÇAS DETECTADAS.</div>`;
+                else out.innerHTML += `<div class="term-line" style="color:#f00">Erro: Comando desconhecido.</div>`;
+                
+                this.value = '';
+                out.scrollTop = out.scrollHeight;
+            }
+        });
+
+        // 6. CRYPT
+        function runCrypt() {
+            const el = document.getElementById('crypt-text');
+            const target = "AS SOMBRAS OBSERVAM";
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            let i = 0;
+            const timer = setInterval(() => {
+                el.innerText = target.split('').map((l, idx) => {
+                    if(idx < i) return target[idx];
+                    return chars[Math.floor(Math.random() * chars.length)];
+                }).join('');
+                if(i >= target.length) clearInterval(timer);
+                i += 1/3;
+            }, 50);
+        }
+
+        // 7. LOGS (PC ONLY)
+        function startLogs() {
+            const pcLog = document.getElementById('pc-log');
+            if(!pcLog) return;
+            const msgs = ["Conexão estabelecida", "Pacote criptografado recebido", "Ping: 24ms", "Atualizando firewall..."];
+            setInterval(() => {
+                const d = document.createElement('div');
+                d.style.marginBottom = "5px";
+                d.innerText = `> ${new Date().toLocaleTimeString()} ${msgs[Math.floor(Math.random()*msgs.length)]}`;
+                pcLog.prepend(d);
+            }, 3000);
+        }
+
+        // Fix para garantir layout no PC ao redimensionar
+        window.onresize = function() {
+            if(window.innerWidth > 900) {
+                document.getElementById('db-list-view').style.display = 'flex';
+                document.getElementById('db-read-view').style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>
